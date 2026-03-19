@@ -1081,7 +1081,20 @@ jsonbinLoad(function(cloud) {
 var dovizCache = {};
 var liveDoviz = {}; // worker'dan gelen canlı döviz verileri
 
+
+function isAdminEditing() {
+  try {
+    var el = document.activeElement;
+    if (!el) return false;
+    if (el.classList && (el.classList.contains('admin-inp') || el.classList.contains('add-item-inp'))) return true;
+    var ov = document.getElementById('overlay');
+    if (ov && ov.classList.contains('open') && el.tagName && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return true;
+  } catch(e) {}
+  return false;
+}
+
 function refreshAdminDataViews() {
+  if (isAdminEditing()) return;
   try { if (document.getElementById('adminDovizRows')) renderAdminDoviz(); } catch(e) {}
   try { if (document.getElementById('adminHurdaRows')) renderAdminHurda(); } catch(e) {}
   try { if (document.getElementById('ekstraDovizRows')) renderEkstraDoviz(); } catch(e) {}
@@ -1309,6 +1322,7 @@ setInterval(function() {
     if (typeof jsonbinLoad === 'function') {
       jsonbinLoad(function(data) {
         if (!data) return;
+        if (isAdminEditing()) return;
         if (data.aktifMod && data.aktifMod !== aktifMod) {
           aktifMod = data.aktifMod;
           try { localStorage.setItem('gp10_mod', aktifMod); } catch(e) {}
