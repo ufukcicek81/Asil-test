@@ -1336,5 +1336,45 @@ setInterval(function() {
 }, 2000);
 
 </script>
+
+<script>
+(function(){
+  try {
+    var aktifMod = localStorage.getItem('gp10_mod') || 'normal';
+
+    window.updateModBtn = function() {
+      var btn = document.getElementById('modBtn');
+      if (!btn) return;
+      if (aktifMod === 'hareketli') {
+        btn.classList.add('hareketli');
+        btn.textContent = '⚡ Hareketli';
+      } else {
+        btn.classList.remove('hareketli');
+        btn.textContent = '✅ Normal';
+      }
+    };
+
+    window.toggleMod = function() {
+      aktifMod = aktifMod === 'normal' ? 'hareketli' : 'normal';
+      localStorage.setItem('gp10_mod', aktifMod);
+      if (typeof settings !== 'undefined') {
+        settings.aktifMod = aktifMod;
+        try { jsonbinSave(settings, function(){}); } catch(e){}
+      }
+      updateModBtn();
+      try {
+        document.getElementById('priceRows').innerHTML = '';
+        if (typeof renderTable === 'function') renderTable();
+      } catch(e){}
+    };
+
+    document.addEventListener("DOMContentLoaded", function(){
+      updateModBtn();
+    });
+
+  } catch(e){}
+})();
+</script>
+
 </body>
 </html>
