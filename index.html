@@ -13,6 +13,16 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 </script>
+<script>
+if (window.location.search.indexOf('admin') !== -1) {
+  try { localStorage.removeItem('gp10_tv'); } catch(e) {}
+  try { sessionStorage.removeItem('gp10_tv'); } catch(e) {}
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.classList.remove('tv-mode');
+  });
+}
+</script>
+
 <meta name="theme-color" content="#b8960c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -579,6 +589,10 @@ var tvMode = false;
 function toggleMod() {
   aktifMod = aktifMod === 'normal' ? 'hareketli' : 'normal';
   localStorage.setItem('gp10_mod', aktifMod);
+  try { settings.aktifMod = aktifMod; } catch(e) {}
+  try {
+    jsonbinSave(settings, function(){});
+  } catch(e) {}
   updateModBtn();
   document.getElementById('priceRows').innerHTML = '';
   renderTable();
@@ -598,7 +612,7 @@ function updateModBtn() {
 
 function applyTVMode() {
   try { localStorage.removeItem('gp10_tv'); } catch(e) {}
-  document.body.classList.toggle('tv-mode', tvMode);
+  document.body.classList.toggle('tv-mode', tvMode && window.location.search.indexOf('admin') === -1);
   var btn = document.getElementById('tvBtn');
   if (btn) {
     btn.classList.toggle('active', tvMode);
@@ -1054,6 +1068,8 @@ jsonbinLoad(function(cloud) {
   if (cloud && cloud.shopName) {
     settings = cloud;
     if (settings.adminPass) ADMIN_PASS = settings.adminPass;
+    if (settings.aktifMod) aktifMod = settings.aktifMod;
+    updateModBtn();
     localStorage.setItem('gp10', JSON.stringify(settings));
     document.getElementById('priceRows').innerHTML = '';
     renderTable();
@@ -1296,7 +1312,9 @@ setInterval(function() {
         if (data.aktifMod && data.aktifMod !== aktifMod) {
           aktifMod = data.aktifMod;
           try { localStorage.setItem('gp10_mod', aktifMod); } catch(e) {}
-          location.reload();
+          updateModBtn();
+          try { document.getElementById('priceRows').innerHTML = ''; } catch(e) {}
+          try { renderTable(); } catch(e) {}
         }
       });
     }
