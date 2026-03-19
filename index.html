@@ -525,12 +525,6 @@ if (window.location.search.indexOf('admin') === -1) {
   document.getElementById('adminEkstra').style.display = 'block';
 }
 applyTVMode();
-
-if (window.location.search.indexOf('admin') !== -1) {
-  tvMode = false;
-  document.body.classList.remove('tv-mode');
-}
-
 updateModBtn();
 
 function checkAdminSession() {
@@ -579,7 +573,7 @@ var settings = loadSettings();
 var hasAlis  = parseFloat(localStorage.getItem('gp10_ha') || '0') || null;
 var hasSatis = parseFloat(localStorage.getItem('gp10_hs') || '0') || null;
 var prevPrices = {};
-var aktifMod = localStorage.getItem('gp10_mod') || 'normal';
+var aktifMod = 'normal';
 var tvMode = false;
 
 function toggleMod() {
@@ -602,8 +596,7 @@ function updateModBtn() {
   }
 }
 
-function applyTVMode() {if (window.location.search.indexOf('admin') !== -1) { tvMode = false; document.body.classList.remove('tv-mode'); }
-  
+function applyTVMode() {
   try { localStorage.removeItem('gp10_tv'); } catch(e) {}
   document.body.classList.toggle('tv-mode', tvMode);
   var btn = document.getElementById('tvBtn');
@@ -1293,6 +1286,23 @@ function renderEkstraHurda() {
   });
   el.innerHTML = html;
 }
+
+// hareketli/normal mod canlı senkron
+setInterval(function() {
+  try {
+    if (typeof jsonbinLoad === 'function') {
+      jsonbinLoad(function(data) {
+        if (!data) return;
+        if (data.aktifMod && data.aktifMod !== aktifMod) {
+          aktifMod = data.aktifMod;
+          try { localStorage.setItem('gp10_mod', aktifMod); } catch(e) {}
+          location.reload();
+        }
+      });
+    }
+  } catch(e) {}
+}, 2000);
+
 </script>
 </body>
 </html>
