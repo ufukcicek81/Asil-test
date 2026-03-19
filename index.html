@@ -526,16 +526,6 @@ if (window.location.search.indexOf('admin') === -1) {
 }
 applyTVMode();
 updateModBtn();
-setTimeout(function() {
-  if (window.location.search.indexOf('admin') !== -1) {
-    tvMode = false;
-    applyTVMode();
-    if (checkAdminSession()) {
-      IS_ADMIN = true;
-      openAdmin();
-    }
-  }
-}, 60);
 
 function checkAdminSession() {
   return sessionStorage.getItem('gp10_admin') === '1';
@@ -583,32 +573,20 @@ var settings = loadSettings();
 var hasAlis  = parseFloat(localStorage.getItem('gp10_ha') || '0') || null;
 var hasSatis = parseFloat(localStorage.getItem('gp10_hs') || '0') || null;
 var prevPrices = {};
-var aktifMod = settings.uiMode || localStorage.getItem('gp10_mod') || 'normal';
+var aktifMod = localStorage.getItem('gp10_mod') || 'normal';
 var tvMode = false;
-document.body.classList.remove('tv-mode');
 
-function setAktifMod(yeniMod, silent) {
-  aktifMod = (yeniMod === 'hareketli') ? 'hareketli' : 'normal';
-  settings.uiMode = aktifMod;
+function toggleMod() {
+  aktifMod = aktifMod === 'normal' ? 'hareketli' : 'normal';
   localStorage.setItem('gp10_mod', aktifMod);
-  localStorage.setItem('gp10', JSON.stringify(settings));
   updateModBtn();
   document.getElementById('priceRows').innerHTML = '';
   renderTable();
-  refreshAdminDataViews();
-  if (!silent) {
-    showToast(aktifMod === 'hareketli' ? '⚡ Hareketli Mod Aktif' : '✅ Normal Mod Aktif');
-  }
-}
-
-function toggleMod() {
-  setAktifMod(aktifMod === 'normal' ? 'hareketli' : 'normal', false);
-  jsonbinSave(settings, function(){});
+  showToast(aktifMod === 'hareketli' ? '⚡ Hareketli Mod Aktif' : '✅ Normal Mod Aktif');
 }
 
 function updateModBtn() {
   var btn = document.getElementById('modBtn');
-  if (!btn) return;
   if (aktifMod === 'hareketli') {
     btn.textContent = '⚡ Hareketli';
     btn.classList.add('hareketli');
@@ -620,20 +598,18 @@ function updateModBtn() {
 
 function applyTVMode() {
   try { localStorage.removeItem('gp10_tv'); } catch(e) {}
-  if (window.location.search.indexOf('admin') !== -1) {
-    tvMode = false;
-  }
-  document.body.classList.toggle('tv-mode', !!tvMode);
+  document.body.classList.toggle('tv-mode', tvMode);
   var btn = document.getElementById('tvBtn');
   if (btn) {
-    btn.classList.toggle('active', !!tvMode);
-    btn.textContent = '📺';
+    btn.classList.toggle('active', tvMode);
+    btn.textContent = tvMode ? '📺' : '📺';
     btn.title = tvMode ? 'TV modu açık' : 'TV modu kapalı';
   }
 }
 
 function toggleTVMode() {
   tvMode = !tvMode;
+  try { localStorage.setItem('gp10_tv_sync', String(Date.now())); } catch(e) {}
   applyTVMode();
   if (tvMode && document.documentElement.requestFullscreen) {
     document.documentElement.requestFullscreen().catch(function(){});
@@ -796,8 +772,6 @@ function fetchPrices() {
 
 // ── YÖNETİCİ ─────────────────────────────────────────────────────────────────
 function openAdmin() {
-  tvMode = false;
-  applyTVMode();
   document.getElementById('aName').value  = settings.shopName;
   document.getElementById('aPhone').value = settings.shopPhone;
   document.getElementById('aKK').value    = (settings.kkOran || 0).toFixed(2);
@@ -997,7 +971,6 @@ function saveAdmin() {
     settings.dovizDuz[d.id+'A'] = parseFloat(document.getElementById('duzA_'+d.id).value) || 0;
     settings.dovizDuz[d.id+'S'] = parseFloat(document.getElementById('duzS_'+d.id).value) || 0;
   });
-  settings.uiMode = aktifMod;
   // Hurda çarpanlarını kaydet
   if (!settings.hurdaCarp) settings.hurdaCarp = {};
   HURDALAR.forEach(function(h) {
@@ -1066,53 +1039,28 @@ setInterval(fetchPrices, 5000);
 fetchDoviz();
 setInterval(fetchDoviz, 60000);
 
-// Buluttan güncel ayarları çek — ilk yükleme + sürekli senkron
-var lastCloudJSON = '';
+// Buluttan güncel ayarları çek — max 3 saniye bekle
 var cloudLoaded = false;
 var cloudTimeout = setTimeout(function() {
   if (!cloudLoaded) {
+    // Firebase gelmediyse localStorage ile devam et, sorun yok
     cloudLoaded = true;
   }
 }, 3000);
 
-function applyCloudSettings(cloud, silent) {
-  if (!cloud || !cloud.shopName) return;
-  settings = cloud;
-  if (!settings.customItems) settings.customItems = [];
-  if (!settings.labor) settings.labor = {};
-  if (settings.adminPass) ADMIN_PASS = settings.adminPass;
-  localStorage.setItem('gp10', JSON.stringify(settings));
-  if (settings.uiMode && settings.uiMode !== aktifMod) {
-    setAktifMod(settings.uiMode, true);
-  } else {
-    updateModBtn();
+jsonbinLoad(function(cloud) {
+  if (cloudLoaded) return; // zaten timeout oldu
+  cloudLoaded = true;
+  clearTimeout(cloudTimeout);
+  if (cloud && cloud.shopName) {
+    settings = cloud;
+    if (settings.adminPass) ADMIN_PASS = settings.adminPass;
+    localStorage.setItem('gp10', JSON.stringify(settings));
     document.getElementById('priceRows').innerHTML = '';
     renderTable();
     refreshAdminDataViews();
   }
-  if (!silent) showToast('🔄 Diğer cihazdan güncellendi');
-}
-
-function syncCloudSettings(silent) {
-  jsonbinLoad(function(cloud) {
-    if (!cloud || !cloud.shopName) return;
-    var nowJSON = JSON.stringify(cloud);
-    if (!cloudLoaded) {
-      cloudLoaded = true;
-      clearTimeout(cloudTimeout);
-      lastCloudJSON = nowJSON;
-      applyCloudSettings(cloud, true);
-      return;
-    }
-    if (nowJSON !== lastCloudJSON) {
-      lastCloudJSON = nowJSON;
-      applyCloudSettings(cloud, !!silent);
-    }
-  });
-}
-
-syncCloudSettings(true);
-setInterval(function(){ syncCloudSettings(false); }, 1200);
+});
 
 // ── DÖVİZ BANT ───────────────────────────────────────────────────────────────
 var dovizCache = {};
@@ -1339,6 +1287,55 @@ function renderEkstraHurda() {
   });
   el.innerHTML = html;
 }
+
+// --- sync patch ---
+try { localStorage.removeItem('gp10_tv'); } catch(e) {}
+
+var __lastSyncBlob = '';
+function __collectSyncState() {
+  try {
+    return JSON.stringify({
+      gp10: localStorage.getItem('gp10') || '',
+      gp10_mod: localStorage.getItem('gp10_mod') || '',
+      gp10_admin_settings: localStorage.getItem('gp10_admin_settings') || '',
+      gp10_jsonbin: localStorage.getItem('gp10_jsonbin') || ''
+    });
+  } catch(e) {
+    return '';
+  }
+}
+function __startCrossDeviceRefresh() {
+  try { __lastSyncBlob = __collectSyncState(); } catch(e) {}
+  setInterval(function() {
+    try {
+      var nowBlob = __collectSyncState();
+      if (__lastSyncBlob && nowBlob && nowBlob !== __lastSyncBlob) {
+        location.reload();
+        return;
+      }
+      __lastSyncBlob = nowBlob;
+      if (typeof jsonbinLoad === 'function' && typeof settings !== 'undefined') {
+        jsonbinLoad(function(remote) {
+          try {
+            var oldBlob = JSON.stringify(settings || {});
+            var newBlob = JSON.stringify(remote || {});
+            if (newBlob && oldBlob !== newBlob) {
+              location.reload();
+            }
+          } catch(e) {}
+        });
+      }
+    } catch(e) {}
+  }, 2000);
+}
+window.addEventListener('storage', function(e) {
+  if (e.key === 'gp10_tv_sync' || e.key === 'gp10' || e.key === 'gp10_mod' || e.key === 'gp10_admin_settings' || e.key === 'gp10_jsonbin') {
+    location.reload();
+  }
+});
+setTimeout(__startCrossDeviceRefresh, 1200);
+// --- sync patch end ---
+
 </script>
 </body>
 </html>
